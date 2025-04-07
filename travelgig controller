@@ -1,0 +1,62 @@
+package com.travelgig.controller;
+
+import com.travelgig.model.Hotel;
+import com.travelgig.model.JsonHotel;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Date;
+import java.util.UUID;
+
+@RestController
+public class GatewayController {
+
+    private final String HOTEL_MICROSERVICE_URL = "http://localhost:8383/api/hotels";
+    
+    @Autowired
+    private RestTemplate restTemplate;
+    
+    @PostMapping("/hotels")
+    public ResponseEntity<Hotel> addHotel(@RequestBody JsonHotel jsonHotel) {
+        try {
+            // Convert JsonHotel to HotelEntity object for microservice
+            Hotel hotelEntity = convertToHotelEntity(jsonHotel);
+            
+            // Call the hotel microservice
+            HttpEntity<Hotel> request = new HttpEntity<>(hotelEntity);
+            ResponseEntity<Hotel> response = restTemplate.postForEntity(
+                HOTEL_MICROSERVICE_URL, 
+                request, 
+                Hotel.class
+            );
+            
+            // Get the persisted hotel object from the response
+            Hotel persistedHotel = response.getBody();
+            
+            // Add unique ID and creation date
+            if (persistedHotel != null) {
+                persistedHotel.setUniqueId(UUID.randomUUID().toString());
+                persistedHotel.setDateOfCreation(new Date());
+            }
+            
+            return new ResponseEntity<>(persistedHotel, HttpStatus.CREATED);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    
+    private Hotel convertToHotelEntity(JsonHotel jsonHotel) {
+        Hotel hotel = new Hotel();
+        hotel.setHotelName(jsonHotel.getHotelName());
+        hotel.setAddress(jsonHotel.getAddress());
+        hotel.setContactDetails(jsonHotel.getContactDetails());
+        hotel.setEmail(jsonHotel.getEmail());
+        return hotel;
+    }
+}
